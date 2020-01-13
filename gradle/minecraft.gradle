@@ -1,0 +1,46 @@
+import org.apache.tools.ant.filters.*
+
+// Replace tokens in the plugin.yml to gradle properties.
+processResources {
+    filter ReplaceTokens, tokens: [
+            "plugin.name"       : rootProject.name,
+            "plugin.version"    : rootProject.version,
+            "plugin.description": rootProject.description,
+    ]
+}
+
+// Create plugin .jar from gradle build.
+task createPlugin(type: Copy) {
+    from jar
+    into 'server/plugins/'
+}
+
+// Bind createPlugin to build process.
+build.dependsOn(createPlugin)
+
+// Issue: due to issue with Intellij only runnning classes when building project we will bind those tasks too.
+classes.finalizedBy(createPlugin)
+
+// Start server task for debugging.
+task startServer(type: JavaExec) {
+    main "-jar"
+    workingDir new File(rootProject.projectDir, "server")
+    args = [
+            new File(rootProject.projectDir, "server/paperspigot.jar"),
+            "-w",
+            "worlds"
+    ]
+    jvmArgs = ["-Dcom.mojang.eula.agree=true"]
+}
+
+// Download latest version of Paper Spigot & create a server folder.
+task createServer {
+    def f = new File('server/paperspigot.jar')
+    f.parentFile.mkdirs()
+    if (!f.exists()) {
+        new URL('https://papermc.io/ci/job/Paper-1.15/lastSuccessfulBuild/artifact/paperclip.jar').withInputStream { i -> f.withOutputStream { it << i } }
+    }
+}
+
+// Bind createServer to initial process, when cloning repository.
+init.finalizedBy(createServer)
